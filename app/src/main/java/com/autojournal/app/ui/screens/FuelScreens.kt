@@ -26,6 +26,16 @@ import com.autojournal.app.ui.components.*
 import com.autojournal.app.util.Dates
 import com.autojournal.app.util.Fmt
 import kotlin.math.roundToLong
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import com.autojournal.app.domain.ReceiptParser
+import com.autojournal.app.util.Photos
+import com.autojournal.app.util.ReceiptScanner
+import kotlinx.coroutines.launch
 
 @Composable
 fun FuelScreen(vm: MainViewModel, nav: NavController) {
@@ -185,12 +195,82 @@ fun RefuelEditScreen(vm: MainViewModel, id: Long, onBack: () -> Unit) {
         onBack()
     }
 
+    // ---- Распознавание чека ----
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var scanning by remember { mutableStateOf(false) }
+    var scanMenu by remember { mutableStateOf(false) }
+    var cameraUri by remember { mutableStateOf<Uri?>(null) }
+    fun scan(uri: Uri) {
+        scanning = true
+        scope.launch {
+            val result = runCatching { ReceiptParser.parse(ReceiptScanner.recognize(ctx, uri)) }
+            scanning = false
+            val r = result.getOrNull()
+            if (r == null || r.isEmpty) {
+                Toast.makeText(ctx, "Не удалось найти литры и сумму на чеке. Снимите ближе и ровнее или введите вручную.",
+                    Toast.LENGTH_LONG).show()
+                return@launch
+            }
+            r.liters?.let { liters = Fmt.input(it) }
+            r.price?.let { price = Fmt.input(it) }
+            r.total?.let { total = Fmt.input(it) }
+            r.grade?.let { grade = it }
+            r.date?.let { date = Dates.fromLocal(it) }
+            val parts = listOfNotNull(
+                r.liters?.let { Fmt.liters(it) }, r.price?.let { Fmt.money(it) + "/л" }, r.total?.let { Fmt.money(it) },
+            ).joinToString(" · ")
+            Toast.makeText(ctx, "Распознано: $parts. Проверьте и укажите пробег.", Toast.LENGTH_LONG).show()
+        }
+    }
+    val gallery = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) scan(uri)
+    }
+    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        val u = cameraUri
+        if (ok && u != null) scan(u)
+    }
+
     EditScaffold(
         title = if (id == 0L) "Новая заправка" else "Заправка",
         onBack = onBack,
         onSave = save,
         onDelete = existing?.let { r -> { vm.io { deleteRefuel(r) }; onBack() } },
     ) {
+        Box {
+            OutlinedButton(
+                onClick = { scanMenu = true }, enabled = !scanning,
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+            ) {
+                if (scanning) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(10.dp))
+                    Text("Читаю чек…")
+                } else {
+                    Icon(Icons.Filled.Receipt, contentDescription = null)
+                    Spacer(Modifier.width(10.dp))
+                    Text("Заполнить по фото чека")
+                }
+            }
+            DropdownMenu(expanded = scanMenu, onDismissRequest = { scanMenu = false }) {
+                DropdownMenuItem(
+                    text = { Text("Сфотографировать чек") },
+                    leadingIcon = { Icon(Icons.Filled.PhotoCamera, contentDescription = null) },
+                    onClick = {
+                        scanMenu = false
+                        val u = Photos.newCameraUri(ctx); cameraUri = u; camera.launch(u)
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Выбрать из галереи") },
+                    leadingIcon = { Icon(Icons.Filled.Image, contentDescription = null) },
+                    onClick = {
+                        scanMenu = false
+                        gallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    },
+                )
+            }
+        }
         DateInput("Дата", date, { date = it })
         NumberInput(odo, { odo = it }, "Пробег", suffix = "км", decimal = false,
             supporting = odoWarn ?: "Сейчас в журнале: ${Fmt.km(currentKm)}", isError = odoWarn != null)

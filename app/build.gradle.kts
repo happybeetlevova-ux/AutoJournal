@@ -13,8 +13,8 @@ android {
         applicationId = "com.autojournal.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "2.0"
     }
 
     // Постоянный ключ подписи: обновления ставятся поверх старой версии без потери данных.
@@ -45,6 +45,12 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+    sourceSets {
+        getByName("test").assets.srcDir("$projectDir/schemas")
+    }
     lint {
         abortOnError = false
         checkReleaseBuilds = false
@@ -75,4 +81,12 @@ dependencies {
 
     implementation("androidx.work:work-runtime-ktx:2.10.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Распознавание текста чеков на телефоне, без интернета
+    implementation("com.google.mlkit:text-recognition:16.0.1")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("androidx.test:core-ktx:1.6.1")
+    testImplementation("androidx.room:room-testing:2.6.1")
 }

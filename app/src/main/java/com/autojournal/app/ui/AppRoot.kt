@@ -80,6 +80,18 @@ import com.autojournal.app.ui.screens.SettingsScreen
 import com.autojournal.app.ui.screens.StatsScreen
 import com.autojournal.app.ui.screens.WelcomeScreen
 import com.autojournal.app.util.Fmt
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.graphics.Color
+import androidx.navigation.compose.dialog
+import com.autojournal.app.MainActivity
+import com.autojournal.app.ui.components.appBackground
+import com.autojournal.app.ui.screens.DocumentEditScreen
+import com.autojournal.app.ui.screens.DocumentsScreen
+import com.autojournal.app.ui.screens.OdometerDialog
+import com.autojournal.app.ui.screens.ShoppingScreen
+import com.autojournal.app.ui.screens.TireEditScreen
+import com.autojournal.app.ui.screens.TiresScreen
+import com.autojournal.app.ui.theme.LocalExtras
 
 private data class Tab(val route: String, val label: String, val icon: ImageVector)
 
@@ -102,7 +114,7 @@ object Routes {
 }
 
 @Composable
-fun AppRoot(openTab: String?, vm: MainViewModel = viewModel()) {
+fun AppRoot(command: String?, onCommandHandled: () -> Unit, vm: MainViewModel = viewModel()) {
     val cars by vm.cars.collectAsStateWithLifecycle()
     val ctx = LocalContext.current
 
@@ -117,7 +129,7 @@ fun AppRoot(openTab: String?, vm: MainViewModel = viewModel()) {
     when {
         list == null -> Box(Modifier.fillMaxSize())
         list.isEmpty() -> WelcomeFlow(vm)
-        else -> MainNav(vm, list, openTab)
+        else -> MainNav(vm, list, command, onCommandHandled)
     }
 }
 
@@ -132,7 +144,7 @@ private fun WelcomeFlow(vm: MainViewModel) {
 }
 
 @Composable
-private fun MainNav(vm: MainViewModel, cars: List<Car>, openTab: String?) {
+private fun MainNav(vm: MainViewModel, cars: List<Car>, command: String?, onCommandHandled: () -> Unit) {
     val nav = rememberNavController()
     val backStack by nav.currentBackStackEntryAsState()
     val route = backStack?.destination?.route
@@ -140,18 +152,31 @@ private fun MainNav(vm: MainViewModel, cars: List<Car>, openTab: String?) {
     val active by vm.activeCar.collectAsStateWithLifecycle()
     val km by vm.currentKm.collectAsStateWithLifecycle()
 
-    LaunchedEffect(openTab) {
-        if (openTab != null && openTab != "home" && tabs.any { it.route == openTab }) {
-            nav.navigate(openTab) { launchSingleTop = true }
+    LaunchedEffect(command) {
+        when (command) {
+            null, "home" -> {}
+            MainActivity.CMD_REFUEL -> nav.navigate(Routes.refuel(0))
+            MainActivity.CMD_SERVICE -> nav.navigate(Routes.service(0))
+            MainActivity.CMD_ODOMETER -> nav.navigate("odometer")
+            "documents" -> nav.navigate("documents") { launchSingleTop = true }
+            else -> if (tabs.any { it.route == command }) nav.navigate(command) { launchSingleTop = true }
         }
+        if (command != null) onCommandHandled()
     }
 
+    val extras = LocalExtras.current
     Scaffold(
+        modifier = Modifier.appBackground(extras.backgroundBrush, MaterialTheme.colorScheme.background),
+        containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = { if (isTab) MainTopBar(vm, nav, cars, active, km) },
         bottomBar = {
             if (isTab) {
-                NavigationBar {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(
+                        alpha = if (LocalExtras.current.glow) 0.85f else 1f
+                    ),
+                ) {
                     tabs.forEach { t ->
                         NavigationBarItem(
                             selected = route == t.route,
@@ -211,6 +236,27 @@ private fun MainNav(vm: MainViewModel, cars: List<Car>, openTab: String?) {
             }
             composable("contact/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) { e ->
                 ContactEditScreen(vm, nav, e.arguments?.getLong("id") ?: 0L, onBack = { nav.popBackStack() })
+            }
+            composable("documents") { DocumentsScreen(vm, nav) }
+            composable("document/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) { e ->
+                DocumentEditScreen(vm, e.arguments?.getLong("id") ?: 0L, onBack = { nav.popBackStack() })
+            }
+            composable("tires") { TiresScreen(vm, nav) }
+            composable("tire/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) { e ->
+                TireEditScreen(vm, e.arguments?.getLong("id") ?: 0L, onBack = { nav.popBackStack() })
+            }
+            composable("shopping") { ShoppingScreen(vm, nav) }
+            dialog("odometer") {
+                val km by vm.currentKm.collectAsStateWithLifecycle()
+                val car by vm.activeCar.collectAsStateWithLifecycle()
+                OdometerDialog(
+                    current = km,
+                    onDismiss = { nav.popBackStack() },
+                    onSave = { v ->
+                        car?.let { c -> vm.io { addOdometer(c.id, v) } }
+                        nav.popBackStack()
+                    },
+                )
             }
         }
     }
@@ -292,5 +338,6 @@ private fun MainTopBar(
                 Icon(Icons.Filled.Settings, contentDescription = "Настройки")
             }
         },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
     )
 }

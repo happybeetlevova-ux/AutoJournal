@@ -152,3 +152,59 @@ data class OdometerLog(
 fun ServicePart.sum(): Double = price * quantity
 fun ServiceWithParts.partsTotal(): Double = parts.sumOf { it.sum() }
 fun ServiceWithParts.total(): Double = record.laborCost + partsTotal()
+
+@Entity(
+    tableName = "documents",
+    foreignKeys = [ForeignKey(
+        entity = Car::class, parentColumns = ["id"], childColumns = ["carId"],
+        onDelete = ForeignKey.CASCADE
+    )],
+    indices = [Index("carId")]
+)
+data class CarDocument(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val carId: Long,
+    val type: String,
+    val number: String = "",
+    val issued: Long? = null,
+    val expires: Long? = null,
+    val photo1: String? = null,
+    val photo2: String? = null,
+    val note: String = "",
+    /** 0 — не уведомляли, 1 — за 30 дней, 2 — за 7 дней, 3 — истёк. */
+    val notifiedStage: Int = 0,
+)
+
+@Entity(
+    tableName = "tire_sets",
+    foreignKeys = [ForeignKey(
+        entity = Car::class, parentColumns = ["id"], childColumns = ["carId"],
+        onDelete = ForeignKey.CASCADE
+    )],
+    indices = [Index("carId")]
+)
+data class TireSet(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val carId: Long,
+    val name: String,
+    val season: String = "Лето",
+    val brand: String = "",
+    val size: String = "",
+    val studded: Boolean = false,
+    val year: Int? = null,
+    val pressureFront: Double? = null,
+    val pressureRear: Double? = null,
+    val treadMm: Double? = null,
+    val storage: String = "",
+    val price: Double = 0.0,
+    val purchaseDate: Long? = null,
+    val installed: Boolean = false,
+    val installedAtKm: Int? = null,
+    /** Пробег, накопленный за прошлые сезоны. */
+    val accumulatedKm: Int = 0,
+    val photoPath: String? = null,
+    val note: String = "",
+)
+
+fun TireSet.mileage(currentKm: Int): Int =
+    accumulatedKm + if (installed && installedAtKm != null) (currentKm - installedAtKm).coerceAtLeast(0) else 0

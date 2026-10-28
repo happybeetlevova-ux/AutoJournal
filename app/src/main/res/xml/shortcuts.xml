@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="refuel"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_fuel"
+        android:shortcutShortLabel="@string/sc_refuel"
+        android:shortcutLongLabel="@string/sc_refuel_long">
+        <intent
+            android:action="com.autojournal.app.NEW_REFUEL"
+            android:targetPackage="com.autojournal.app"
+            android:targetClass="com.autojournal.app.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="service"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_service"
+        android:shortcutShortLabel="@string/sc_service"
+        android:shortcutLongLabel="@string/sc_service_long">
+        <intent
+            android:action="com.autojournal.app.NEW_SERVICE"
+            android:targetPackage="com.autojournal.app"
+            android:targetClass="com.autojournal.app.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="odometer"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_speed"
+        android:shortcutShortLabel="@string/sc_odometer"
+        android:shortcutLongLabel="@string/sc_odometer_long">
+        <intent
+            android:action="com.autojournal.app.ODOMETER"
+            android:targetPackage="com.autojournal.app"
+            android:targetClass="com.autojournal.app.MainActivity" />
+    </shortcut>
+</shortcuts>

@@ -4,6 +4,7 @@ import android.content.SharedPreferences
 import androidx.room.withTransaction
 import com.autojournal.app.domain.Calc
 import com.autojournal.app.domain.Categories
+import com.autojournal.app.ui.theme.AppStyle
 import com.autojournal.app.util.Dates
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,9 +15,23 @@ class Repository(val db: AppDatabase, val prefs: SharedPreferences) {
     private val _activeCarId = MutableStateFlow(prefs.getLong(KEY_ACTIVE, 0L))
     val activeCarId: StateFlow<Long> = _activeCarId
 
+    /** Вызывается при смене выбранного авто (обновление виджета). */
+    var onActiveCarChanged: (() -> Unit)? = null
+
     fun setActiveCar(id: Long) {
         prefs.edit().putLong(KEY_ACTIVE, id).apply()
         _activeCarId.value = id
+        onActiveCarChanged?.invoke()
+    }
+
+    private val _style = MutableStateFlow(
+        runCatching { AppStyle.valueOf(prefs.getString(KEY_STYLE, null) ?: "") }.getOrDefault(AppStyle.GARAGE)
+    )
+    val style: StateFlow<AppStyle> = _style
+
+    fun setStyle(s: AppStyle) {
+        prefs.edit().putString(KEY_STYLE, s.name).apply()
+        _style.value = s
     }
 
     val cars: Flow<List<Car>> = db.cars().observeAll()
@@ -25,6 +40,8 @@ class Repository(val db: AppDatabase, val prefs: SharedPreferences) {
     fun services(carId: Long): Flow<List<ServiceWithParts>> = db.services().observeForCar(carId)
     fun reminders(carId: Long): Flow<List<Reminder>> = db.reminders().observeForCar(carId)
     fun odometerLogs(carId: Long): Flow<List<OdometerLog>> = db.odometer().observeForCar(carId)
+    fun documents(carId: Long): Flow<List<CarDocument>> = db.documents().observeForCar(carId)
+    fun tires(carId: Long): Flow<List<TireSet>> = db.tires().observeForCar(carId)
     fun servicesByContact(contactId: Long): Flow<List<ServiceWithParts>> =
         db.services().observeByContact(contactId)
 
@@ -95,6 +112,45 @@ class Repository(val db: AppDatabase, val prefs: SharedPreferences) {
     suspend fun addDefaultReminders(carId: Long, km: Int) =
         db.reminders().insertMany(Categories.defaultReminders(carId, km, Dates.today()))
 
+    // ---------- Документы ----------
+    suspend fun saveDocument(d: CarDocument) {
+        if (d.id == 0L) db.documents().insert(d) else {
+            val old = db.documents().get(d.id)
+            // Новый срок действия — уведомлять заново.
+            val stage = if (old?.expires != d.expires) 0 else d.notifiedStage
+            db.documents().update(d.copy(notifiedStage = stage))
+        }
+    }
+
+    suspend fun deleteDocument(d: CarDocument) = db.documents().delete(d)
+
+    // ---------- Шины ----------
+    suspend fun saveTireSet(t: TireSet) {
+        if (t.id == 0L) db.tires().insert(t) else db.tires().update(t)
+    }
+
+    suspend fun deleteTireSet(t: TireSet) = db.tires().delete(t)
+
+    /** Ставит комплект на машину; пробег снятых комплектов копится. */
+    suspend fun installTireSet(set: TireSet, km: Int) {
+        db.withTransaction {
+            db.tires().getForCar(set.carId).filter { it.installed && it.id != set.id }.forEach { removeInternal(it, km) }
+            val fresh = db.tires().get(set.id) ?: set
+            if (!fresh.installed) db.tires().update(fresh.copy(installed = true, installedAtKm = km))
+        }
+    }
+
+    suspend fun removeTireSet(set: TireSet, km: Int) {
+        db.withTransaction {
+            val fresh = db.tires().get(set.id) ?: set
+            removeInternal(fresh, km)
+        }
+    }
+
+    private suspend fun removeInternal(t: TireSet, km: Int) {
+        db.tires().update(t.copy(installed = false, installedAtKm = null, accumulatedKm = t.mileage(km)))
+    }
+
     // ---------- Пробег ----------
     suspend fun addOdometer(carId: Long, km: Int, date: Long = Dates.today()) {
         db.odometer().insert(OdometerLog(carId = carId, date = date, odometer = km))
@@ -111,5 +167,6 @@ class Repository(val db: AppDatabase, val prefs: SharedPreferences) {
 
     companion object {
         private const val KEY_ACTIVE = "active_car"
+        private const val KEY_STYLE = "style"
     }
 }

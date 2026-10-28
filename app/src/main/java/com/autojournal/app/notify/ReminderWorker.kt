@@ -1,18 +1,24 @@
 package com.autojournal.app.notify
 
 import android.content.Context
+import android.net.Uri
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.autojournal.app.App
+import com.autojournal.app.data.Backup
 import com.autojournal.app.domain.Calc
 import com.autojournal.app.domain.DueState
 import com.autojournal.app.util.Dates
 import com.autojournal.app.util.Fmt
+import com.autojournal.app.widget.CarWidgetProvider
 
 /**
- * Дважды в сутки проверяет напоминания всех автомобилей.
- * «Скоро» — уведомляет один раз, «просрочено» — повторяет раз в 3 дня.
- * Если пробег давно не обновлялся — мягко просит его обновить.
+ * Дважды в сутки:
+ *  • напоминания о заменах («скоро» — один раз, «просрочено» — раз в 3 дня);
+ *  • сроки документов (за 30 дней, за 7 дней, истёк);
+ *  • просьба обновить пробег, если он давно не вводился;
+ *  • автокопия раз в неделю в выбранную папку;
+ *  • обновление виджета.
  */
 class ReminderWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
 
@@ -45,6 +51,28 @@ class ReminderWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                 shown++
             }
 
+            // Документы
+            repo.db.documents().getAll().filter { it.carId == car.id }.forEach { d ->
+                val exp = d.expires ?: return@forEach
+                val days = Math.floorDiv(exp - today, Dates.DAY).toInt()
+                val stage = when {
+                    days < 0 -> 3
+                    days <= 7 -> 2
+                    days <= 30 -> 1
+                    else -> 0
+                }
+                if (stage > d.notifiedStage || (force && stage > 0)) {
+                    val text = when (stage) {
+                        3 -> "Срок истёк ${Dates.format(exp)}"
+                        else -> "Действует до ${Dates.format(exp)} — осталось ${Fmt.days(days)}"
+                    }
+                    Notifications.show(applicationContext, 300_000 + (d.id % 100_000).toInt(),
+                        "${d.type}: ${car.name}", text, openTab = "documents")
+                    repo.db.documents().update(d.copy(notifiedStage = stage))
+                    shown++
+                }
+            }
+
             // Напоминание обновить пробег
             val hasKmReminders = reminders.any { (it.intervalKm ?: 0) > 0 }
             val lastReading = readings.maxOfOrNull { it.first }
@@ -56,10 +84,13 @@ class ReminderWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                 Notifications.show(applicationContext, 500_000 + (car.id % 100_000).toInt(),
                     "Обновите пробег: ${car.name}",
                     "Последние данные ${Dates.format(lastReading)} (${Fmt.km(km)}). Так прогноз замен будет точнее.",
-                    openTab = "home")
+                    openTab = "odometer")
                 repo.prefs.edit().putLong(nudgeKey, today).apply()
             }
         }
+
+        autoBackup(app)
+        CarWidgetProvider.requestUpdate(applicationContext)
 
         if (force && shown == 0) {
             Notifications.show(applicationContext, 999, "Всё в порядке",
@@ -68,7 +99,20 @@ class ReminderWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         return Result.success()
     }
 
+    private suspend fun autoBackup(app: App) {
+        val prefs = app.repo.prefs
+        val uri = prefs.getString(KEY_AUTO_URI, null) ?: return
+        val last = prefs.getLong(KEY_AUTO_LAST, 0L)
+        if (System.currentTimeMillis() - last < 7 * Dates.DAY) return
+        runCatching { Backup.autoBackupToFolder(app, app.db, Uri.parse(uri)) }
+            .onSuccess { prefs.edit().putLong(KEY_AUTO_LAST, System.currentTimeMillis()).remove(KEY_AUTO_ERROR).apply() }
+            .onFailure { prefs.edit().putString(KEY_AUTO_ERROR, it.message ?: "ошибка").apply() }
+    }
+
     companion object {
         const val KEY_FORCE = "force"
+        const val KEY_AUTO_URI = "auto_backup_uri"
+        const val KEY_AUTO_LAST = "auto_backup_last"
+        const val KEY_AUTO_ERROR = "auto_backup_error"
     }
 }

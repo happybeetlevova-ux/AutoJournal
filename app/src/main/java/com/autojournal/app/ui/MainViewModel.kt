@@ -5,6 +5,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.autojournal.app.App
 import com.autojournal.app.data.Car
+import com.autojournal.app.data.CarDocument
+import com.autojournal.app.data.TireSet
+import com.autojournal.app.ui.theme.AppStyle
 import com.autojournal.app.data.Contact
 import com.autojournal.app.data.OdometerLog
 import com.autojournal.app.data.Refuel
@@ -50,6 +53,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     val odometerLogs: StateFlow<List<OdometerLog>> = carId.flatMapLatest { repo.odometerLogs(it) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val documents: StateFlow<List<CarDocument>> = carId.flatMapLatest { repo.documents(it) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val tires: StateFlow<List<TireSet>> = carId.flatMapLatest { repo.tires(it) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val style: StateFlow<AppStyle> = repo.style
 
     val contacts: StateFlow<List<Contact>> =
         repo.contacts.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())

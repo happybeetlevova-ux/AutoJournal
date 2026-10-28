@@ -1,3 +1,10 @@
 <resources>
     <string name="app_name">АвтоЖурнал</string>
+    <string name="sc_refuel">Заправка</string>
+    <string name="sc_refuel_long">Новая заправка</string>
+    <string name="sc_service">Сервис</string>
+    <string name="sc_service_long">Запись в сервис</string>
+    <string name="sc_odometer">Пробег</string>
+    <string name="sc_odometer_long">Обновить пробег</string>
+    <string name="widget_desc">Пробег и ближайшая замена</string>
 </resources>

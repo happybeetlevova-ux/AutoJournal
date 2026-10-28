@@ -335,6 +335,8 @@ fun PhotoBox(
     val scope = rememberCoroutineScope()
     var menu by remember { mutableStateOf(false) }
     var cameraUri by remember { mutableStateOf<Uri?>(null) }
+    var viewer by remember { mutableStateOf(false) }
+    if (viewer && path != null) PhotoViewer(path) { viewer = false }
 
     fun importUri(uri: Uri) {
         scope.launch {
@@ -399,6 +401,11 @@ fun PhotoBox(
                 )
                 if (path != null) {
                     DropdownMenuItem(
+                        text = { Text("Открыть") },
+                        leadingIcon = { Icon(Icons.Filled.Image, contentDescription = null) },
+                        onClick = { menu = false; viewer = true },
+                    )
+                    DropdownMenuItem(
                         text = { Text("Убрать фото") },
                         leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
                         onClick = { menu = false; onChange(null) },
@@ -460,6 +467,7 @@ fun SectionCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        border = cardBorder(),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (title != null || action != null) {

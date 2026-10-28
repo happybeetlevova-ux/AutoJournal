@@ -75,6 +75,7 @@ fun RemindersScreen(vm: MainViewModel, nav: NavController) {
                 st, today,
                 onClick = { nav.navigate(Routes.reminder(st.reminder.id)) },
                 onDone = { doneFor = st },
+                onShop = { nav.navigate("shopping") },
             )
         }
     }
@@ -103,13 +104,20 @@ fun RemindersScreen(vm: MainViewModel, nav: NavController) {
 }
 
 @Composable
-private fun ReminderCard(st: ReminderStatus, today: Long, onClick: () -> Unit, onDone: () -> Unit) {
+private fun ReminderCard(
+    st: ReminderStatus,
+    today: Long,
+    onClick: () -> Unit,
+    onDone: () -> Unit,
+    onShop: () -> Unit,
+) {
     val r = st.reminder
     val color = statusColor(st.state)
     Card(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        border = cardBorder(),
     ) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -148,6 +156,13 @@ private fun ReminderCard(st: ReminderStatus, today: Long, onClick: () -> Unit, o
             )
             st.predictedDateText(today)?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            }
+            if (st.state == DueState.SOON || st.state == DueState.OVERDUE) {
+                TextButton(onClick = onShop, contentPadding = PaddingValues(horizontal = 0.dp)) {
+                    Icon(Icons.Filled.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Что купить к замене")
+                }
             }
         }
     }

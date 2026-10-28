@@ -214,10 +214,7 @@ fun WelcomeScreen(vm: MainViewModel, onAddCar: () -> Unit) {
     val restore = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
             val msg = runCatching {
-                val text = withContext(Dispatchers.IO) {
-                    ctx.contentResolver.openInputStream(uri)!!.bufferedReader().use { it.readText() }
-                }
-                val n = Backup.importJson(vm.repo.db, text)
+                val n = withContext(Dispatchers.IO) { Backup.restore(ctx, vm.repo.db, uri) }
                 "Восстановлено автомобилей: $n"
             }.getOrElse { "Не удалось восстановить: ${it.message}" }
             Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show()
@@ -251,7 +248,7 @@ fun WelcomeScreen(vm: MainViewModel, onAddCar: () -> Unit) {
                 Text("Добавить автомобиль")
             }
             Spacer(Modifier.height(10.dp))
-            TextButton(onClick = { restore.launch(arrayOf("application/json", "*/*")) }) {
+            TextButton(onClick = { restore.launch(arrayOf("application/zip", "application/json", "*/*")) }) {
                 Text("Восстановить из резервной копии")
             }
         }

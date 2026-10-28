@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: write
+  checks: write
 
 jobs:
   build:
@@ -17,15 +18,31 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
-      - name: Сборка
+
+      - name: Тесты и сборка
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace
+          set -o pipefail
+          ./gradlew testDebugUnitTest assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log
           cp app/build/outputs/apk/release/app-release.apk AutoJournal.apk
+
+      - name: Ошибки сборки
+        if: failure()
+        run: |
+          {
+            grep -E "^e: |error:|FAILED|What went wrong|Exception|expected:|Caused by|AssertionError|> Task .*FAILED" build.log || true
+            for f in app/build/test-results/testDebugUnitTest/*.xml; do
+              [ -f "$f" ] && grep -A6 "<failure" "$f" || true
+            done
+          } | head -c 9000 > errors.txt
+          msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g' errors.txt)
+          echo "::error title=Ошибки сборки::$msg"
+
       - uses: actions/upload-artifact@v4
         with:
           name: AutoJournal-apk
           path: AutoJournal.apk
+
       - name: Публикация релиза
         uses: softprops/action-gh-release@v2
         with:

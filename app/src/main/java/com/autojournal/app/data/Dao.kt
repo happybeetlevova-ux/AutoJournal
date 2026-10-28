@@ -198,3 +198,60 @@ interface OdometerDao {
     @Query("DELETE FROM odometer_logs")
     suspend fun deleteAll()
 }
+
+@Dao
+interface DocumentDao {
+    @Query("SELECT * FROM documents WHERE carId = :carId ORDER BY CASE WHEN expires IS NULL THEN 1 ELSE 0 END, expires, id")
+    fun observeForCar(carId: Long): Flow<List<CarDocument>>
+
+    @Query("SELECT * FROM documents WHERE id = :id")
+    suspend fun get(id: Long): CarDocument?
+
+    @Query("SELECT * FROM documents")
+    suspend fun getAll(): List<CarDocument>
+
+    @Insert
+    suspend fun insert(item: CarDocument): Long
+
+    @Update
+    suspend fun update(item: CarDocument)
+
+    @Delete
+    suspend fun delete(item: CarDocument)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(items: List<CarDocument>)
+
+    @Query("DELETE FROM documents")
+    suspend fun deleteAll()
+}
+
+@Dao
+interface TireDao {
+    @Query("SELECT * FROM tire_sets WHERE carId = :carId ORDER BY installed DESC, id")
+    fun observeForCar(carId: Long): Flow<List<TireSet>>
+
+    @Query("SELECT * FROM tire_sets WHERE carId = :carId")
+    suspend fun getForCar(carId: Long): List<TireSet>
+
+    @Query("SELECT * FROM tire_sets WHERE id = :id")
+    suspend fun get(id: Long): TireSet?
+
+    @Query("SELECT * FROM tire_sets")
+    suspend fun getAll(): List<TireSet>
+
+    @Insert
+    suspend fun insert(item: TireSet): Long
+
+    @Update
+    suspend fun update(item: TireSet)
+
+    @Delete
+    suspend fun delete(item: TireSet)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(items: List<TireSet>)
+
+    @Query("DELETE FROM tire_sets")
+    suspend fun deleteAll()
+}

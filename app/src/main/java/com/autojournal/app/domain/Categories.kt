@@ -43,6 +43,13 @@ object Categories {
         "Мойка", "Эвакуатор", "Страховая", "Дилер", "Другое",
     )
 
+    val documentTypes = listOf(
+        "ОСАГО", "КАСКО", "СТС", "ПТС", "Водительское удостоверение",
+        "Диагностическая карта", "Договор купли-продажи", "Гарантия", "Другое",
+    )
+
+    val tireSeasons = listOf("Лето", "Зима", "Всесезон")
+
     /** Типовой регламент для нового автомобиля. */
     fun defaultReminders(carId: Long, km: Int, today: Long): List<Reminder> = listOf(
         Reminder(carId = carId, title = "Замена масла и масляного фильтра", category = "Моторное масло",
