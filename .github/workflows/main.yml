@@ -19,7 +19,19 @@ jobs:
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
 
+      - name: Ключ подписи из секретов
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::Не заданы секреты KEYSTORE_B64 и KEYSTORE_PASS (Settings → Secrets and variables → Actions)"
+            exit 1
+          fi
+          echo "$KEYSTORE_B64" | base64 -d > app/release.jks
+
       - name: Тесты и сборка
+        env:
+          KEYSTORE_PASS: ${{ secrets.KEYSTORE_PASS }}
         run: |
           chmod +x gradlew
           set -o pipefail

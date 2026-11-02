@@ -18,12 +18,13 @@ android {
     }
 
     // Постоянный ключ подписи: обновления ставятся поверх старой версии без потери данных.
+    // Ключ и пароль приходят из секретов GitHub (KEYSTORE_B64, KEYSTORE_PASS), в коде их нет.
     signingConfigs {
-        create("app") {
-            storeFile = file("autojournal.jks")
-            storePassword = "autojournal"
+        create("release") {
+            storeFile = file("release.jks")
+            storePassword = System.getenv("KEYSTORE_PASS")
             keyAlias = "autojournal"
-            keyPassword = "autojournal"
+            keyPassword = System.getenv("KEYSTORE_PASS")
         }
     }
 
@@ -32,10 +33,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("app")
-        }
-        debug {
-            signingConfig = signingConfigs.getByName("app")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
